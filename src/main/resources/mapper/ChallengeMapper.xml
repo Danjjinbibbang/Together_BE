@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.ChallengeMapper">
+
+    <sql id="columns">
+        ID, TITLE, TARGET_AMOUNT, START_DATE, END_DATE, INVITE_CODE, MISSION_MODE, CREATED_AT
+    </sql>
+
+    <select id="findById" resultType="Challenge">
+        SELECT
+        <include refid="columns"/>
+        FROM CHALLENGE
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findByInviteCode" resultType="Challenge">
+        SELECT
+        <include refid="columns"/>
+        FROM CHALLENGE
+        WHERE INVITE_CODE = #{inviteCode}
+    </select>
+
+    <!--
+      탈퇴한 챌린지는 "내가 속한 목록"에 넣지 않으므로 본인 MEMBER 는 ACTIVE 만 조인한다.
+      집계 서브쿼리도 ACTIVE 멤버만 세어 탈퇴자의 잔액이 팀 합계에 남지 않게 한다.
+    -->
+    <select id="findSummariesByUserId" resultType="ChallengeSummary">
+        SELECT c.ID            AS CHALLENGE_ID,
+               c.TITLE         AS TITLE,
+               c.TARGET_AMOUNT AS GOAL_AMOUNT,
+               c.START_DATE    AS START_DATE,
+               c.END_DATE      AS END_DATE,
+               NVL(agg.TOTAL_BALANCE, 0) AS CURRENT_BALANCE,
+               NVL(agg.MEMBER_COUNT, 0)  AS MEMBER_COUNT,
+               me.THEME_COLOR  AS THEME_COLOR
+          FROM CHALLENGE c
+          JOIN MEMBER me
+            ON me.CHALLENGE_ID = c.ID
+           AND me.USER_ID = #{userId}
+           AND me.STATUS = 'ACTIVE'
+          LEFT JOIN (SELECT m.CHALLENGE_ID           AS CHALLENGE_ID,
+                            SUM(NVL(a.BALANCE, 0))   AS TOTAL_BALANCE,
+                            COUNT(*)                 AS MEMBER_COUNT
+                       FROM MEMBER m
+                       LEFT JOIN ACCOUNT a ON a.MEMBER_ID = m.ID
+                      WHERE m.STATUS = 'ACTIVE'
+                      GROUP BY m.CHALLENGE_ID) agg
+            ON agg.CHALLENGE_ID = c.ID
+         ORDER BY c.CREATED_AT DESC, c.ID DESC
+    </select>
+
+    <insert id="insert" parameterType="Challenge"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO CHALLENGE (TITLE, TARGET_AMOUNT, START_DATE, END_DATE, INVITE_CODE, MISSION_MODE)
+        VALUES (#{title}, #{targetAmount}, #{startDate}, #{endDate}, #{inviteCode}, #{missionMode})
+    </insert>
+
+    <!-- FR-036. 부분 갱신이 아니라 전체 덮어쓰기다. 병합은 서비스가 한다. -->
+    <update id="update" parameterType="Challenge">
+        UPDATE CHALLENGE
+           SET TITLE = #{title},
+               TARGET_AMOUNT = #{targetAmount},
+               START_DATE = #{startDate},
+               END_DATE = #{endDate}
+         WHERE ID = #{id}
+    </update>
+
+    <update id="updateMissionMode">
+        UPDATE CHALLENGE
+           SET MISSION_MODE = #{missionMode}
+         WHERE ID = #{id}
+    </update>
+
+</mapper>
