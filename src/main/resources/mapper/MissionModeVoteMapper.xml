@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MissionModeVoteMapper">
+
+    <sql id="columns">
+        ID, CHALLENGE_ID, STATUS, DEADLINE, OUTCOME, RESULT_MODE, OPENED_BY_MEMBER_ID,
+        CREATED_AT, CLOSED_AT
+    </sql>
+
+    <select id="findById" resultType="MissionModeVote">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_MODE_VOTE
+        WHERE ID = #{id}
+    </select>
+
+    <!-- 열린 투표는 챌린지당 하나뿐이라 단건이다(UX_MMV_OPEN_PER_CHALLENGE 가 보장). -->
+    <select id="findOpenByChallengeId" resultType="MissionModeVote">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_MODE_VOTE
+        WHERE CHALLENGE_ID = #{challengeId}
+          AND STATUS = 'OPEN'
+    </select>
+
+    <select id="findLatestByChallengeId" resultType="MissionModeVote">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_MODE_VOTE
+        WHERE CHALLENGE_ID = #{challengeId}
+        ORDER BY ID DESC
+        FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <insert id="insert" parameterType="MissionModeVote"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO MISSION_MODE_VOTE (CHALLENGE_ID, STATUS, DEADLINE, OPENED_BY_MEMBER_ID)
+        VALUES (#{challengeId}, 'OPEN', #{deadline}, #{openedByMemberId})
+    </insert>
+
+    <!--
+      STATUS='OPEN' 인 행만 닫는다. 같은 투표를 두 요청이 동시에 닫으려 하면 한쪽만 1을 받고
+      다른 쪽은 0을 받으므로, 서비스가 "이미 닫혔다"를 그 자리에서 알 수 있다.
+    -->
+    <update id="close">
+        UPDATE MISSION_MODE_VOTE
+           SET STATUS = 'CLOSED',
+               OUTCOME = #{outcome},
+               RESULT_MODE = #{resultMode},
+               CLOSED_AT = #{closedAt}
+         WHERE ID = #{id}
+           AND STATUS = 'OPEN'
+    </update>
+
+</mapper>

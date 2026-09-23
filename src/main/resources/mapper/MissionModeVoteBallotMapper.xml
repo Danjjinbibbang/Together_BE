@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MissionModeVoteBallotMapper">
+
+    <select id="find" resultType="MissionModeVoteBallot">
+        SELECT VOTE_ID, MEMBER_ID, CHOICE, VOTED_AT
+        FROM MISSION_MODE_VOTE_BALLOT
+        WHERE VOTE_ID = #{voteId}
+          AND MEMBER_ID = #{memberId}
+    </select>
+
+    <select id="countByChoice" resultType="VoteChoiceCount">
+        SELECT CHOICE   AS CHOICE,
+               COUNT(*) AS COUNT
+          FROM MISSION_MODE_VOTE_BALLOT
+         WHERE VOTE_ID = #{voteId}
+         GROUP BY CHOICE
+         ORDER BY CHOICE
+    </select>
+
+    <!--
+      MERGE 로 넣거나 바꾼다. 재투표는 새 표가 아니라 마음이 바뀐 것이라 행이 늘면 안 된다.
+      MEMBER_NOTIFICATION_SETTING.upsert 와 같은 방식이다.
+    -->
+    <update id="upsert">
+        MERGE INTO MISSION_MODE_VOTE_BALLOT t
+        USING (SELECT #{voteId} AS VOTE_ID, #{memberId} AS MEMBER_ID, #{choice} AS CHOICE FROM DUAL) s
+           ON (t.VOTE_ID = s.VOTE_ID AND t.MEMBER_ID = s.MEMBER_ID)
+        WHEN MATCHED THEN
+            UPDATE SET t.CHOICE = s.CHOICE, t.VOTED_AT = SYSTIMESTAMP
+        WHEN NOT MATCHED THEN
+            INSERT (VOTE_ID, MEMBER_ID, CHOICE) VALUES (s.VOTE_ID, s.MEMBER_ID, s.CHOICE)
+    </update>
+
+</mapper>
