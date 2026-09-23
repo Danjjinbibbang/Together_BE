@@ -1,0 +1,2 @@
+# MyBatis 매퍼 XML을 이곳에 둔다. com.together.mapper 의 인터페이스와 1:1로 대응시킬 것.
+# 예) com.together.mapper.ChallengeMapper  ↔  mapper/ChallengeMapper.xml

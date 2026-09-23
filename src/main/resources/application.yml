@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: together-be
+  profiles:
+    default: local
+  datasource:
+    driver-class-name: oracle.jdbc.OracleDriver
+    url: ${ORACLE_URL:jdbc:oracle:thin:@localhost:1521/FREEPDB1}
+    username: ${ORACLE_USERNAME:}
+    password: ${ORACLE_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+      connection-timeout: 5000
+      # DB가 아직 없어도 애플리케이션은 기동되게 한다(첫 쿼리 시점에 연결 실패)
+      initialization-fail-timeout: -1
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.together.dto
+  configuration:
+    map-underscore-to-camel-case: true
+    # Oracle은 null 파라미터에 JDBC 타입이 필요하다.
+    # 따옴표 필수 — 없으면 YAML 이 null 리터럴로 읽어 MyBatis 가 OTHER(1111) 로 폴백하고
+    # nullable 컬럼에 null 을 넣는 INSERT 가 전부 ORA-17004 로 깨진다.
+    jdbc-type-for-null: "NULL"
+
+app:
+  jwt:
+    # 시크릿은 환경변수로만 주입한다. 비워두면 기동 시 임시 키가 생성된다(로컬 전용).
+    secret: ${JWT_SECRET:}
+    expiration-minutes: ${JWT_EXPIRATION_MINUTES:720}
+    # FR-035 리프레시 토큰. 회전 방식이라 재발급 때마다 새 토큰이 나가고 이전 것은 폐기된다.
+    refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS:30}
+    issuer: together-be
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:}
+    token-uri: https://kauth.kakao.com/oauth/token
+    user-info-uri: https://kapi.kakao.com/v2/user/me
+    # 연결 끊기 콜백(POST /auth/kakao/unlink-callback) 검증용. 카카오 콘솔의 Admin 키다.
+    admin-key: ${KAKAO_ADMIN_KEY:}
+  vote:
+    # FR-008 미션 방식 팀원 투표. v0.4 §4 가 미확정으로 남긴 값이라 설정으로 뺐다.
+    default-duration-hours: ${VOTE_DEFAULT_DURATION_HOURS:24}
+    quorum-percent: ${VOTE_QUORUM_PERCENT:50}
+  message:
+    # FR-044 팀 응원 메시지. 도배 방지 — 한 사람이 하루에 보낼 수 있는 건수.
+    daily-limit-per-member: ${TEAM_MESSAGE_DAILY_LIMIT:5}
+  review:
+    # FR-012c 방장이 판정하지 않을 때 작성자가 자동 승인을 요청할 수 있게 되기까지의 시간.
+    owner-response-hours: ${REVIEW_OWNER_RESPONSE_HOURS:72}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  invite:
+    # 초대 링크 앞부분. 뒤에 ?code=... 가 붙는다(화면 6).
+    base-url: ${INVITE_BASE_URL:https://gatimoeugi.app/join}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.together: debug
+    com.together.mapper: debug

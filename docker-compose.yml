@@ -1,0 +1,30 @@
+# 로컬 개발용 Oracle. 운영 배포와는 무관하다.
+#
+# 접속 정보는 .env(커밋 제외)에서 읽는다 — 이 파일에는 시크릿을 적지 않는다.
+#   docker compose up -d          기동
+#   docker compose down           중지 (데이터는 볼륨에 유지)
+#   docker compose down -v        볼륨까지 삭제 (스키마 초기화)
+#
+# 이미지는 Oracle Database 23ai Free 기반 커뮤니티 이미지다.
+# APP_USER/APP_USER_PASSWORD를 주면 FREEPDB1에 애플리케이션 전용 계정을 만들어 준다.
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    container_name: together-oracle
+    ports:
+      - "1521:1521"
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD}   # SYS / SYSTEM 비밀번호
+      APP_USER: ${ORACLE_USERNAME}              # 애플리케이션 전용 계정
+      APP_USER_PASSWORD: ${ORACLE_PASSWORD}
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh" ]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+volumes:
+  oracle-data:

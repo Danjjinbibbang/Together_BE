@@ -1,0 +1,31 @@
+### Gradle ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### Eclipse / VS Code ###
+.classpath
+.project
+.settings/
+bin/
+.vscode/
+
+### 시크릿 (DB 계정, 카카오 키, JWT 시크릿 등은 절대 커밋 금지) ###
+.env
+.env.local
+*.env
+src/main/resources/application-local.yml
+src/main/resources/application-dev.yml
+src/main/resources/application-prod.yml
+
+### 기타 ###
+*.log
+logs/
+.DS_Store

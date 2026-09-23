@@ -1,0 +1,26 @@
+# 로컬 개발용 설정 예시.
+# 이 파일을 application-local.yml 로 복사해서 값을 채운다. (application-local.yml 은 .gitignore 대상)
+# 환경변수(ORACLE_URL, JWT_SECRET ...)를 쓰는 쪽이 더 안전하며, 그 경우 이 파일은 필요 없다.
+#
+# 로컬 DB는 레포 루트의 docker-compose.yml 로 띄운다(Oracle 23ai Free, PDB 이름은 FREEPDB1).
+# 계정/비밀번호는 .env 와 이 파일의 값이 서로 일치해야 한다.
+
+spring:
+  datasource:
+    url: jdbc:oracle:thin:@localhost:1521/FREEPDB1
+    username: together
+    password: CHANGE_ME
+
+app:
+  jwt:
+    secret: CHANGE_ME_32자_이상의_임의_문자열_HS256용
+  kakao:
+    # developers.kakao.com 에서 앱 생성 후 "앱 키 > REST API 키" 를 넣는다.
+    # 프론트가 인가 URL 로 리다이렉트할 때 쓰는 키와 같은 값이다(JavaScript 키 아님).
+    client-id: CHANGE_ME
+    # 카카오 콘솔에서 "보안 > Client Secret" 을 켠 경우에만 채운다. 안 켰으면 비워 둘 것.
+    client-secret:
+    # 카카오 콘솔의 "카카오 로그인 > Redirect URI" 에 똑같이 등록해야 한다.
+    redirect-uri: http://localhost:5173/oauth/kakao/callback
+  cors:
+    allowed-origins: http://localhost:5173
