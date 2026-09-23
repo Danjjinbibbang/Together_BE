@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MemberMapper">
+
+    <sql id="columns">
+        ID, USER_ID, CHALLENGE_ID, NICKNAME, ROLE, STATUS, THEME_COLOR, JOINED_AT
+    </sql>
+
+    <select id="findById" resultType="Member">
+        SELECT
+        <include refid="columns"/>
+        FROM MEMBER
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findByUserIdAndChallengeId" resultType="Member">
+        SELECT
+        <include refid="columns"/>
+        FROM MEMBER
+        WHERE USER_ID = #{userId}
+          AND CHALLENGE_ID = #{challengeId}
+    </select>
+
+    <!-- 탈퇴자(LEFT)까지 포함해서 돌려준다. 노출 여부 판단은 서비스 몫이다. -->
+    <!-- 한 사람이 참여한 모든 챌린지. 계정 탈퇴(FR-043)가 방장 여부를 훑을 때 쓴다. -->
+    <select id="findByUserId" resultType="Member">
+        SELECT
+        <include refid="columns"/>
+        FROM MEMBER
+        WHERE USER_ID = #{userId}
+        ORDER BY CHALLENGE_ID
+    </select>
+
+    <select id="findByChallengeId" resultType="Member">
+        SELECT
+        <include refid="columns"/>
+        FROM MEMBER
+        WHERE CHALLENGE_ID = #{challengeId}
+        ORDER BY JOINED_AT, ID
+    </select>
+
+    <!-- 계좌가 아직 없으면 잔액 0 으로 본다(생성 직후 짧은 구간). -->
+    <select id="findWithBalanceByChallengeId" resultType="MemberBalance">
+        SELECT m.ID       AS MEMBER_ID,
+               m.NICKNAME AS NICKNAME,
+               m.ROLE     AS ROLE,
+               m.STATUS   AS STATUS,
+               NVL(a.BALANCE, 0) AS BALANCE
+          FROM MEMBER m
+          LEFT JOIN ACCOUNT a ON a.MEMBER_ID = m.ID
+         WHERE m.CHALLENGE_ID = #{challengeId}
+         ORDER BY m.JOINED_AT, m.ID
+    </select>
+
+    <insert id="insert" parameterType="Member"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO MEMBER (USER_ID, CHALLENGE_ID, NICKNAME, ROLE, STATUS, THEME_COLOR)
+        VALUES (#{userId}, #{challengeId}, #{nickname}, #{role}, #{status}, #{themeColor})
+    </insert>
+
+    <update id="updateNickname">
+        UPDATE MEMBER
+           SET NICKNAME = #{nickname}
+         WHERE ID = #{id}
+    </update>
+
+    <update id="updateThemeColor">
+        UPDATE MEMBER
+           SET THEME_COLOR = #{themeColor}
+         WHERE ID = #{id}
+    </update>
+
+    <update id="updateRole">
+        UPDATE MEMBER
+           SET ROLE = #{role}
+         WHERE ID = #{id}
+    </update>
+
+    <!-- FR-043 계정 탈퇴. 참여 중인 모든 챌린지에서 한 번에 나간다. -->
+    <update id="updateStatusByUserId">
+        UPDATE MEMBER
+           SET STATUS = #{status}
+         WHERE USER_ID = #{userId}
+           AND STATUS != #{status}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE MEMBER
+           SET STATUS = #{status}
+         WHERE ID = #{id}
+    </update>
+
+</mapper>
