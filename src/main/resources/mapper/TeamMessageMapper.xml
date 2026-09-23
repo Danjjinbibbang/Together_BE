@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.TeamMessageMapper">
+
+    <select id="findById" resultType="TeamMessage">
+        SELECT ID, CHALLENGE_ID, SENDER_MEMBER_ID, CONTENT, CREATED_AT, UPDATED_AT, DELETED_AT
+        FROM TEAM_MESSAGE
+        WHERE ID = #{id}
+    </select>
+
+    <!-- 탈퇴자가 보낸 메시지도 그대로 남긴다 — 과거 기록의 닉네임을 살리는 원칙과 같다. -->
+    <select id="findViewsByChallengeId" resultType="TeamMessageView">
+        SELECT tm.ID         AS MESSAGE_ID,
+               tm.SENDER_MEMBER_ID AS SENDER_MEMBER_ID,
+               me.NICKNAME   AS NICKNAME,
+               tm.CONTENT    AS CONTENT,
+               tm.CREATED_AT AS CREATED_AT,
+               tm.UPDATED_AT AS UPDATED_AT
+          FROM TEAM_MESSAGE tm
+          JOIN MEMBER me ON me.ID = tm.SENDER_MEMBER_ID
+         WHERE tm.CHALLENGE_ID = #{challengeId}
+           AND tm.DELETED_AT IS NULL
+           AND (#{cursor} IS NULL OR tm.ID &lt; #{cursor})
+         ORDER BY tm.ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <!-- 지운 메시지도 센다. 지우고 다시 보내면 하루 한도가 무한이 되기 때문이다. -->
+    <select id="countBySenderSince" resultType="int">
+        SELECT COUNT(*)
+          FROM TEAM_MESSAGE
+         WHERE SENDER_MEMBER_ID = #{senderMemberId}
+           AND CREATED_AT >= #{from}
+    </select>
+
+    <update id="updateContent">
+        UPDATE TEAM_MESSAGE
+           SET CONTENT = #{content},
+               UPDATED_AT = SYSTIMESTAMP
+         WHERE ID = #{id}
+           AND DELETED_AT IS NULL
+    </update>
+
+    <!-- 행을 지우지 않는다. 지우고 다시 보내는 식의 한도 우회를 막으려면 이력이 남아야 한다. -->
+    <update id="softDelete">
+        UPDATE TEAM_MESSAGE
+           SET DELETED_AT = SYSTIMESTAMP
+         WHERE ID = #{id}
+           AND DELETED_AT IS NULL
+    </update>
+
+    <insert id="insert" parameterType="TeamMessage"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO TEAM_MESSAGE (CHALLENGE_ID, SENDER_MEMBER_ID, CONTENT)
+        VALUES (#{challengeId}, #{senderMemberId}, #{content})
+    </insert>
+
+</mapper>

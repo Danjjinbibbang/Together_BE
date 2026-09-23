@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.CommentMapper">
+
+    <sql id="columns">
+        ID, MISSION_LOG_ID, SENDER_MEMBER_ID, CONTENT, CREATED_AT
+    </sql>
+
+    <!-- 삭제 권한(작성자 본인 여부) 확인에 쓴다. -->
+    <select id="findById" resultType="Comment">
+        SELECT
+        <include refid="columns"/>
+        FROM COMMENTS
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findViewsByMissionLogId" resultType="CommentView">
+        SELECT c.ID               AS COMMENT_ID,
+               c.SENDER_MEMBER_ID AS MEMBER_ID,
+               me.NICKNAME        AS NICKNAME,
+               c.CONTENT          AS CONTENT,
+               c.CREATED_AT       AS CREATED_AT
+          FROM COMMENTS c
+          JOIN MEMBER me ON me.ID = c.SENDER_MEMBER_ID
+         WHERE c.MISSION_LOG_ID = #{missionLogId}
+         ORDER BY c.CREATED_AT, c.ID
+    </select>
+
+    <insert id="insert" parameterType="Comment"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO COMMENTS (MISSION_LOG_ID, SENDER_MEMBER_ID, CONTENT)
+        VALUES (#{missionLogId}, #{senderMemberId}, #{content})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM COMMENTS
+        WHERE ID = #{id}
+    </delete>
+
+</mapper>

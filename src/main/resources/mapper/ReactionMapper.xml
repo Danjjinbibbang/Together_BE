@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.ReactionMapper">
+
+    <sql id="columns">
+        ID, MISSION_LOG_ID, SENDER_MEMBER_ID, REACTION_TYPE, CREATED_AT
+    </sql>
+
+    <!-- 멤버당 1개(UK_REACTION_LOG_SENDER)라 이모지 타입은 조건에 넣지 않는다. -->
+    <select id="findByMissionLogIdAndSenderMemberId" resultType="Reaction">
+        SELECT
+        <include refid="columns"/>
+        FROM REACTION
+        WHERE MISSION_LOG_ID = #{missionLogId}
+          AND SENDER_MEMBER_ID = #{senderMemberId}
+    </select>
+
+    <select id="findByMissionLogId" resultType="Reaction">
+        SELECT
+        <include refid="columns"/>
+        FROM REACTION
+        WHERE MISSION_LOG_ID = #{missionLogId}
+        ORDER BY CREATED_AT, ID
+    </select>
+
+    <select id="countByMissionLogId" resultType="ReactionCount">
+        SELECT REACTION_TYPE AS REACTION_TYPE,
+               COUNT(*)      AS COUNT
+          FROM REACTION
+         WHERE MISSION_LOG_ID = #{missionLogId}
+         GROUP BY REACTION_TYPE
+         ORDER BY REACTION_TYPE
+    </select>
+
+    <insert id="insert" parameterType="Reaction"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO REACTION (MISSION_LOG_ID, SENDER_MEMBER_ID, REACTION_TYPE)
+        VALUES (#{missionLogId}, #{senderMemberId}, #{reactionType})
+    </insert>
+
+    <delete id="deleteById">
+        DELETE FROM REACTION
+        WHERE ID = #{id}
+    </delete>
+
+</mapper>
