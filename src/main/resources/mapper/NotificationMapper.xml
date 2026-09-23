@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.NotificationMapper">
+
+    <sql id="columns">
+        ID, RECEIVER_MEMBER_ID, NOTI_TYPE, CONTENT, TARGET_TYPE, TARGET_ID, IS_READ, CREATED_AT
+    </sql>
+
+    <select id="findById" resultType="Notification">
+        SELECT
+        <include refid="columns"/>
+        FROM NOTIFICATION
+        WHERE ID = #{id}
+    </select>
+
+    <!--
+      전역 알림함이라 사용자에 속한 모든 MEMBER 의 알림을 모은다.
+      ID 가 채번 순서라 최신순 정렬과 일치한다 — 그래서 커서를 ID 하나로 쓸 수 있다.
+    -->
+    <select id="findByUserId" resultType="Notification">
+        SELECT n.ID, n.RECEIVER_MEMBER_ID, n.NOTI_TYPE, n.CONTENT,
+               n.TARGET_TYPE, n.TARGET_ID, n.IS_READ, n.CREATED_AT
+          FROM NOTIFICATION n
+          JOIN MEMBER m ON m.ID = n.RECEIVER_MEMBER_ID
+         WHERE m.USER_ID = #{userId}
+           AND (#{cursor} IS NULL OR n.ID &lt; #{cursor})
+         ORDER BY n.ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <select id="countUnreadByUserId" resultType="int">
+        SELECT COUNT(*)
+          FROM NOTIFICATION n
+          JOIN MEMBER m ON m.ID = n.RECEIVER_MEMBER_ID
+         WHERE m.USER_ID = #{userId}
+           AND n.IS_READ = 'N'
+    </select>
+
+    <select id="findByReceiverMemberId" resultType="Notification">
+        SELECT
+        <include refid="columns"/>
+        FROM NOTIFICATION
+        WHERE RECEIVER_MEMBER_ID = #{receiverMemberId}
+        ORDER BY CREATED_AT DESC, ID DESC
+    </select>
+
+    <insert id="insert" parameterType="Notification"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO NOTIFICATION (RECEIVER_MEMBER_ID, NOTI_TYPE, CONTENT, TARGET_TYPE, TARGET_ID, IS_READ)
+        VALUES (#{receiverMemberId}, #{notiType}, #{content}, #{targetType}, #{targetId}, #{isRead})
+    </insert>
+
+    <update id="markAsRead">
+        UPDATE NOTIFICATION
+           SET IS_READ = 'Y'
+         WHERE ID = #{id}
+    </update>
+
+    <!--
+      대상 하나에 매달린 알림을 한 번에 손본다(IX_NOTIFICATION_TARGET).
+      메시지를 고치면 팀원 알림함의 문구도 같이 바뀌어야 하기 때문이다 — 알림 본문은
+      발송 시점 스냅샷이라 원본만 고쳐서는 반영되지 않는다.
+    -->
+    <update id="updateContentByTarget">
+        UPDATE NOTIFICATION
+           SET CONTENT = #{content}
+         WHERE TARGET_TYPE = #{targetType}
+           AND TARGET_ID = #{targetId}
+    </update>
+
+    <!-- 삭제는 흔적 없이 사라지는 쪽이라 행을 지운다. 안 읽은 건이면 뱃지 숫자도 함께 줄어든다. -->
+    <delete id="deleteByTarget">
+        DELETE FROM NOTIFICATION
+         WHERE TARGET_TYPE = #{targetType}
+           AND TARGET_ID = #{targetId}
+    </delete>
+
+</mapper>

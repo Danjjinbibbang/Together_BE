@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MemberNotificationSettingMapper">
+
+    <select id="findByMemberId" resultType="MemberNotificationSetting">
+        SELECT MEMBER_ID, NOTI_TYPE, ENABLED
+          FROM MEMBER_NOTIFICATION_SETTING
+         WHERE MEMBER_ID = #{memberId}
+         ORDER BY NOTI_TYPE
+    </select>
+
+    <select id="findEnabled" resultType="string">
+        SELECT ENABLED
+          FROM MEMBER_NOTIFICATION_SETTING
+         WHERE MEMBER_ID = #{memberId}
+           AND NOTI_TYPE = #{notiType}
+    </select>
+
+    <!-- 팀 전원 발송 시 멤버마다 조회하지 않으려고 꺼둔 사람만 한 번에 가져온다. -->
+    <select id="findDisabledMemberIds" resultType="long">
+        SELECT s.MEMBER_ID
+          FROM MEMBER_NOTIFICATION_SETTING s
+          JOIN MEMBER m ON m.ID = s.MEMBER_ID
+         WHERE m.CHALLENGE_ID = #{challengeId}
+           AND s.NOTI_TYPE = #{notiType}
+           AND s.ENABLED = 'N'
+    </select>
+
+    <update id="upsert">
+        MERGE INTO MEMBER_NOTIFICATION_SETTING t
+        USING (SELECT #{memberId} AS MEMBER_ID, #{notiType} AS NOTI_TYPE FROM DUAL) s
+           ON (t.MEMBER_ID = s.MEMBER_ID AND t.NOTI_TYPE = s.NOTI_TYPE)
+        WHEN MATCHED THEN
+            UPDATE SET t.ENABLED = #{enabled}
+        WHEN NOT MATCHED THEN
+            INSERT (MEMBER_ID, NOTI_TYPE, ENABLED)
+            VALUES (#{memberId}, #{notiType}, #{enabled})
+    </update>
+
+</mapper>
