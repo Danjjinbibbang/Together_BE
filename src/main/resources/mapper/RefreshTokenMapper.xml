@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.RefreshTokenMapper">
+
+    <sql id="columns">
+        ID, USER_ID, TOKEN_HASH, EXPIRES_AT, REVOKED_AT, CREATED_AT
+    </sql>
+
+    <!--
+      만료·폐기된 행도 그대로 돌려준다. 걸러서 null 로 만들면 "없는 토큰"과 "폐기된 토큰"을
+      구분할 수 없는데, 폐기된 토큰이 다시 오는 것은 탈취 신호라 다르게 다뤄야 한다.
+    -->
+    <select id="findByTokenHash" resultType="RefreshToken">
+        SELECT
+        <include refid="columns"/>
+        FROM REFRESH_TOKEN
+        WHERE TOKEN_HASH = #{tokenHash}
+    </select>
+
+    <insert id="insert" parameterType="RefreshToken"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO REFRESH_TOKEN (USER_ID, TOKEN_HASH, EXPIRES_AT)
+        VALUES (#{userId}, #{tokenHash}, #{expiresAt})
+    </insert>
+
+    <update id="revokeById">
+        UPDATE REFRESH_TOKEN
+           SET REVOKED_AT = #{revokedAt}
+         WHERE ID = #{id}
+           AND REVOKED_AT IS NULL
+    </update>
+
+    <update id="revokeAllByUserId">
+        UPDATE REFRESH_TOKEN
+           SET REVOKED_AT = #{revokedAt}
+         WHERE USER_ID = #{userId}
+           AND REVOKED_AT IS NULL
+    </update>
+
+</mapper>
