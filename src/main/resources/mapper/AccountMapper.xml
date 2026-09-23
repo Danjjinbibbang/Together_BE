@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.AccountMapper">
+
+    <sql id="columns">
+        ID, MEMBER_ID, BALANCE
+    </sql>
+
+    <select id="findById" resultType="Account">
+        SELECT
+        <include refid="columns"/>
+        FROM ACCOUNT
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findByMemberId" resultType="Account">
+        SELECT
+        <include refid="columns"/>
+        FROM ACCOUNT
+        WHERE MEMBER_ID = #{memberId}
+    </select>
+
+    <!-- 탈퇴자 잔액은 팀 합계에서 뺀다. 참여자가 없으면 NVL 로 0 을 돌려준다. -->
+    <select id="sumBalanceByChallengeId" resultType="long">
+        SELECT NVL(SUM(a.BALANCE), 0)
+          FROM ACCOUNT a
+          JOIN MEMBER m ON m.ID = a.MEMBER_ID
+         WHERE m.CHALLENGE_ID = #{challengeId}
+           AND m.STATUS = 'ACTIVE'
+    </select>
+
+    <insert id="insert" parameterType="Account"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO ACCOUNT (MEMBER_ID, BALANCE)
+        VALUES (#{memberId}, #{balance})
+    </insert>
+
+    <!-- 덧셈을 DB 에서 처리해야 동시 입금 시 갱신 유실이 없다. 읽고-더하고-쓰지 않는다. -->
+    <update id="addBalance">
+        UPDATE ACCOUNT
+           SET BALANCE = BALANCE + #{amount}
+         WHERE ID = #{id}
+    </update>
+
+</mapper>

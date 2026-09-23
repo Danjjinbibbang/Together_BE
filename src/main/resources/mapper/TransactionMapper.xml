@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.TransactionMapper">
+
+    <sql id="columns">
+        ID, ACCOUNT_ID, MISSION_LOG_ID, ORIGINAL_TRANSACTION_ID, AMOUNT, TX_TYPE, CREATED_AT
+    </sql>
+
+    <select id="findById" resultType="Transaction">
+        SELECT
+        <include refid="columns"/>
+        FROM TRANSACTIONS
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findByAccountId" resultType="Transaction">
+        SELECT
+        <include refid="columns"/>
+        FROM TRANSACTIONS
+        WHERE ACCOUNT_ID = #{accountId}
+        ORDER BY ID DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+
+    <select id="countByAccountId" resultType="int">
+        SELECT COUNT(*) FROM TRANSACTIONS WHERE ACCOUNT_ID = #{accountId}
+    </select>
+
+    <select id="findByMissionLogId" resultType="Transaction">
+        SELECT
+        <include refid="columns"/>
+        FROM TRANSACTIONS
+        WHERE MISSION_LOG_ID = #{missionLogId}
+        ORDER BY CREATED_AT, ID
+    </select>
+
+    <insert id="insert" parameterType="Transaction"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO TRANSACTIONS (ACCOUNT_ID, MISSION_LOG_ID, ORIGINAL_TRANSACTION_ID, AMOUNT, TX_TYPE)
+        VALUES (#{accountId}, #{missionLogId}, #{originalTransactionId}, #{amount}, #{txType})
+    </insert>
+
+</mapper>
