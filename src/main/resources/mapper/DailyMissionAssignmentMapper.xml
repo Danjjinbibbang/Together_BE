@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.DailyMissionAssignmentMapper">
+
+    <sql id="columns">
+        ID, CHALLENGE_ID, MISSION_ID, ASSIGNED_DATE, REWARD_AMOUNT, CREATED_AT
+    </sql>
+
+    <select id="findById" resultType="DailyMissionAssignment">
+        SELECT
+        <include refid="columns"/>
+        FROM DAILY_MISSION_ASSIGNMENT
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findByChallengeIdAndAssignedDate" resultType="DailyMissionAssignment">
+        SELECT
+        <include refid="columns"/>
+        FROM DAILY_MISSION_ASSIGNMENT
+        WHERE CHALLENGE_ID = #{challengeId}
+          AND ASSIGNED_DATE = #{assignedDate}
+    </select>
+
+    <!--
+      내 제출 상태는 LEFT JOIN 이다 — 아직 제출 전이면 MY_SUBMISSION_STATUS 가 null 로 내려간다.
+      확정 금액(dma.REWARD_AMOUNT)은 일부러 뽑지 않는다. 화면 10 에는 범위만 노출하고
+      정확한 금액은 미션 완료 후에 처음 공개하는 게 기획 의도다.
+    -->
+    <select id="findTodayMission" resultType="TodayMission">
+        SELECT dma.ID              AS ASSIGNMENT_ID,
+               m.ID                AS MISSION_ID,
+               m.TITLE             AS TITLE,
+               m.SUBMIT_TYPE       AS SUBMIT_TYPE,
+               m.REWARD_MIN        AS REWARD_MIN,
+               m.REWARD_MAX        AS REWARD_MAX,
+               m.MIN_TEXT_LENGTH   AS MIN_TEXT_LENGTH,
+               dma.ASSIGNED_DATE   AS ASSIGNED_DATE,
+               ml.STATUS           AS MY_SUBMISSION_STATUS
+          FROM DAILY_MISSION_ASSIGNMENT dma
+          JOIN MISSION m ON m.ID = dma.MISSION_ID
+          LEFT JOIN MISSION_LOG ml
+            ON ml.ASSIGNMENT_ID = dma.ID
+           AND ml.MEMBER_ID = #{memberId}
+         WHERE dma.CHALLENGE_ID = #{challengeId}
+           AND dma.ASSIGNED_DATE = #{assignedDate}
+    </select>
+
+    <insert id="insert" parameterType="DailyMissionAssignment"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO DAILY_MISSION_ASSIGNMENT (CHALLENGE_ID, MISSION_ID, ASSIGNED_DATE, REWARD_AMOUNT)
+        VALUES (#{challengeId}, #{missionId}, #{assignedDate}, #{rewardAmount})
+    </insert>
+
+    <select id="countByMissionId" resultType="int">
+        SELECT COUNT(*)
+          FROM DAILY_MISSION_ASSIGNMENT
+         WHERE MISSION_ID = #{missionId}
+    </select>
+
+</mapper>

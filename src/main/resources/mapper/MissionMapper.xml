@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MissionMapper">
+
+    <sql id="columns">
+        ID, CHALLENGE_ID, TITLE, SUBMIT_TYPE, REWARD_MIN, REWARD_MAX, MIN_TEXT_LENGTH,
+        CREATED_BY_TYPE, CREATED_BY_MEMBER_ID, IS_ACTIVE
+    </sql>
+
+    <select id="findById" resultType="Mission">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findActiveFixedPool" resultType="Mission">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION
+        WHERE CHALLENGE_ID IS NULL
+          AND IS_ACTIVE = 'Y'
+        ORDER BY ID
+    </select>
+
+    <select id="findActiveByChallengeId" resultType="Mission">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION
+        WHERE CHALLENGE_ID = #{challengeId}
+          AND IS_ACTIVE = 'Y'
+        ORDER BY ID
+    </select>
+
+    <!-- 방장 관리 화면은 비활성 미션도 봐야 한다(IS_ACTIVE 토글 UI) -->
+    <select id="findAllByChallengeId" resultType="Mission">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION
+        WHERE CHALLENGE_ID = #{challengeId}
+        ORDER BY ID
+        OFFSET #{offset} ROWS FETCH NEXT #{limit} ROWS ONLY
+    </select>
+
+    <select id="countByChallengeId" resultType="int">
+        SELECT COUNT(*) FROM MISSION WHERE CHALLENGE_ID = #{challengeId}
+    </select>
+
+    <insert id="insert" parameterType="Mission"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO MISSION (CHALLENGE_ID, TITLE, SUBMIT_TYPE, REWARD_MIN, REWARD_MAX, MIN_TEXT_LENGTH,
+                             CREATED_BY_TYPE, CREATED_BY_MEMBER_ID, IS_ACTIVE)
+        VALUES (#{challengeId}, #{title}, #{submitType}, #{rewardMin}, #{rewardMax}, #{minTextLength},
+                #{createdByType}, #{createdByMemberId}, #{isActive})
+    </insert>
+
+    <!-- 부분 갱신이 아니라 전체 덮어쓰기다. 병합은 서비스가 한다. -->
+    <update id="update" parameterType="Mission">
+        UPDATE MISSION
+           SET TITLE = #{title},
+               SUBMIT_TYPE = #{submitType},
+               REWARD_MIN = #{rewardMin},
+               REWARD_MAX = #{rewardMax},
+               MIN_TEXT_LENGTH = #{minTextLength},
+               IS_ACTIVE = #{isActive}
+         WHERE ID = #{id}
+    </update>
+
+    <!-- 배정 이력이 있는 미션은 서비스가 먼저 막는다. 여기까지 오면 참조가 없다는 뜻이다. -->
+    <delete id="deleteById">
+        DELETE FROM MISSION
+         WHERE ID = #{id}
+    </delete>
+
+</mapper>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.together.mapper.MissionLogMapper">
+
+    <sql id="columns">
+        ID, MEMBER_ID, ASSIGNMENT_ID, SUBMIT_CONTENT, ATTACHMENT_URL, REWARD_AMOUNT, IS_PUBLIC,
+        STATUS, REVIEWED_BY, REJECT_REASON_CODE, RESUBMIT_COUNT, REVIEW_REQUESTED_AT,
+        COMPLETED_AT, CREATED_AT
+    </sql>
+
+    <select id="findById" resultType="MissionLog">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_LOG
+        WHERE ID = #{id}
+    </select>
+
+    <select id="findDetailById" resultType="MissionLogDetail">
+        SELECT ml.ID                 AS MISSION_LOG_ID,
+               ml.ASSIGNMENT_ID      AS ASSIGNMENT_ID,
+               mi.TITLE              AS MISSION_TITLE,
+               dma.CHALLENGE_ID      AS CHALLENGE_ID,
+               ml.MEMBER_ID          AS MEMBER_ID,
+               me.NICKNAME           AS NICKNAME,
+               ml.SUBMIT_CONTENT     AS SUBMIT_CONTENT,
+               ml.ATTACHMENT_URL     AS ATTACHMENT_URL,
+               ml.IS_PUBLIC          AS IS_PUBLIC,
+               ml.STATUS             AS STATUS,
+               ml.REVIEWED_BY        AS REVIEWED_BY,
+               ml.REJECT_REASON_CODE AS REJECT_REASON_CODE,
+               ml.REWARD_AMOUNT      AS REWARD_AMOUNT,
+               ml.CREATED_AT         AS CREATED_AT
+          FROM MISSION_LOG ml
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+          JOIN MISSION mi ON mi.ID = dma.MISSION_ID
+          JOIN MEMBER me ON me.ID = ml.MEMBER_ID
+         WHERE ml.ID = #{id}
+    </select>
+
+    <select id="findByMemberIdAndAssignmentId" resultType="MissionLog">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_LOG
+        WHERE MEMBER_ID = #{memberId}
+          AND ASSIGNMENT_ID = #{assignmentId}
+    </select>
+
+    <select id="findByMemberId" resultType="MissionLog">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_LOG
+        WHERE MEMBER_ID = #{memberId}
+        ORDER BY CREATED_AT DESC, ID DESC
+    </select>
+
+    <select id="findByAssignmentId" resultType="MissionLog">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_LOG
+        WHERE ASSIGNMENT_ID = #{assignmentId}
+        ORDER BY CREATED_AT, ID
+    </select>
+
+    <select id="findByStatus" resultType="MissionLog">
+        SELECT
+        <include refid="columns"/>
+        FROM MISSION_LOG
+        WHERE STATUS = #{status}
+        ORDER BY CREATED_AT DESC, ID DESC
+    </select>
+
+    <!--
+      assignedDate / memberId 는 선택 필터다. 동적 SQL 분기 대신 (파라미터 IS NULL OR 조건) 으로
+      표현해 쿼리를 하나로 유지했다 — 매퍼에 조건 분기를 넣지 않는다는 규칙 때문이다.
+      본문은 미리보기 길이만 잘라서 내린다. 비공개 처리는 서비스가 한다.
+
+      정렬 기준을 ASSIGNED_DATE 에서 ID 로 바꿨다. 제출은 당일 배정에만 가능해 ID 순서가
+      배정일 순서와 같고, 커서를 ID 하나로 단순하게 쓸 수 있기 때문이다.
+    -->
+    <select id="findFeedByChallengeId" resultType="MissionLogFeedItem">
+        SELECT ml.ID               AS MISSION_LOG_ID,
+               ml.ASSIGNMENT_ID    AS ASSIGNMENT_ID,
+               mi.TITLE            AS MISSION_TITLE,
+               dma.ASSIGNED_DATE   AS ASSIGNED_DATE,
+               ml.MEMBER_ID        AS MEMBER_ID,
+               me.NICKNAME         AS NICKNAME,
+               ml.STATUS           AS STATUS,
+               ml.REVIEWED_BY      AS REVIEWED_BY,
+               ml.REWARD_AMOUNT    AS REWARD_AMOUNT,
+               ml.IS_PUBLIC        AS IS_PUBLIC,
+               DBMS_LOB.SUBSTR(ml.SUBMIT_CONTENT, 100, 1) AS SUBMIT_CONTENT_PREVIEW
+          FROM MISSION_LOG ml
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+          JOIN MISSION mi ON mi.ID = dma.MISSION_ID
+          JOIN MEMBER me ON me.ID = ml.MEMBER_ID
+         WHERE dma.CHALLENGE_ID = #{challengeId}
+           AND (#{assignedDate} IS NULL OR dma.ASSIGNED_DATE = #{assignedDate})
+           AND (#{memberId} IS NULL OR ml.MEMBER_ID = #{memberId})
+           AND (#{cursor} IS NULL OR ml.ID &lt; #{cursor})
+         ORDER BY ml.ID DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <insert id="insert" parameterType="MissionLog"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="ID">
+        INSERT INTO MISSION_LOG (MEMBER_ID, ASSIGNMENT_ID, SUBMIT_CONTENT, ATTACHMENT_URL,
+                                 REWARD_AMOUNT, IS_PUBLIC, STATUS, REVIEWED_BY,
+                                 REJECT_REASON_CODE, COMPLETED_AT)
+        VALUES (#{memberId}, #{assignmentId}, #{submitContent}, #{attachmentUrl},
+                #{rewardAmount}, #{isPublic}, #{status}, #{reviewedBy},
+                #{rejectReasonCode}, #{completedAt})
+    </insert>
+
+    <update id="updateSubmission">
+        UPDATE MISSION_LOG
+           SET SUBMIT_CONTENT = #{submitContent},
+               ATTACHMENT_URL = #{attachmentUrl}
+         WHERE ID = #{id}
+    </update>
+
+    <!-- 어느 상태로 보낼지는 서비스가 판단한다. 여기서는 받은 값을 그대로 기록만 한다. -->
+    <update id="updateStatus">
+        UPDATE MISSION_LOG
+           SET STATUS = #{status},
+               REVIEWED_BY = #{reviewedBy},
+               REJECT_REASON_CODE = #{rejectReasonCode}
+         WHERE ID = #{id}
+    </update>
+
+    <update id="updateRewardAmount">
+        UPDATE MISSION_LOG
+           SET REWARD_AMOUNT = #{rewardAmount}
+         WHERE ID = #{id}
+    </update>
+
+    <update id="increaseResubmitCount">
+        UPDATE MISSION_LOG
+           SET RESUBMIT_COUNT = RESUBMIT_COUNT + 1
+         WHERE ID = #{id}
+    </update>
+
+    <!--
+      GET /me/calendar (화면 16). 챌린지를 가로지르므로 MEMBER.USER_ID 로 들어간다(IX_MEMBER_USER).
+      하루에 두 챌린지를 수행하면 두 행이 나오고, 날짜로 묶는 것은 서비스가 한다.
+
+      금액은 TRANSACTIONS 순액이다. 오탐으로 회수된 기록도 MISSION_LOG.REWARD_AMOUNT 는
+      남아 있어서, 그것을 더하면 캘린더 합계가 계좌 잔액과 어긋난다. REVERSAL 이 음수라
+      순액을 더하면 회수분이 자연히 빠진다.
+    -->
+    <select id="findCalendarEntriesByUserId" resultType="CalendarEntry">
+        SELECT dma.ASSIGNED_DATE AS ACTIVITY_DATE,
+               c.ID              AS CHALLENGE_ID,
+               c.TITLE           AS CHALLENGE_TITLE,
+               me.THEME_COLOR    AS THEME_COLOR,
+               COUNT(*)          AS MISSION_COUNT,
+               NVL(SUM(tx.NET_AMOUNT), 0) AS REWARD_AMOUNT
+          FROM MISSION_LOG ml
+          JOIN MEMBER me ON me.ID = ml.MEMBER_ID
+          JOIN CHALLENGE c ON c.ID = me.CHALLENGE_ID
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+          <!-- 거래를 그냥 조인하면 기록당 여러 건이라 COUNT(*) 가 부풀어, 미리 합쳐서 붙인다. -->
+          LEFT JOIN (SELECT MISSION_LOG_ID, SUM(AMOUNT) AS NET_AMOUNT
+                       FROM TRANSACTIONS
+                      GROUP BY MISSION_LOG_ID) tx ON tx.MISSION_LOG_ID = ml.ID
+         WHERE me.USER_ID = #{userId}
+           AND dma.ASSIGNED_DATE BETWEEN #{from} AND #{to}
+         GROUP BY dma.ASSIGNED_DATE, c.ID, c.TITLE, me.THEME_COLOR
+         ORDER BY dma.ASSIGNED_DATE, c.ID
+    </select>
+
+    <!--
+      GET /me/mission-logs?date= (FR-040). 작성자가 항상 본인이라 닉네임을 담지 않고,
+      대신 어느 챌린지 것인지와 캘린더 색을 담는다.
+    -->
+    <select id="findMyLogsByUserIdAndDate" resultType="MyMissionLogItem">
+        SELECT ml.ID             AS MISSION_LOG_ID,
+               c.ID              AS CHALLENGE_ID,
+               c.TITLE           AS CHALLENGE_TITLE,
+               me.THEME_COLOR    AS THEME_COLOR,
+               mi.TITLE          AS MISSION_TITLE,
+               dma.ASSIGNED_DATE AS ASSIGNED_DATE,
+               ml.STATUS         AS STATUS,
+               ml.REVIEWED_BY    AS REVIEWED_BY,
+               ml.REWARD_AMOUNT  AS REWARD_AMOUNT,
+               ml.IS_PUBLIC      AS IS_PUBLIC
+          FROM MISSION_LOG ml
+          JOIN MEMBER me ON me.ID = ml.MEMBER_ID
+          JOIN CHALLENGE c ON c.ID = me.CHALLENGE_ID
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+          JOIN MISSION mi ON mi.ID = dma.MISSION_ID
+         WHERE me.USER_ID = #{userId}
+           AND dma.ASSIGNED_DATE = #{date}
+         ORDER BY c.ID
+    </select>
+
+    <!-- FR-025② 전체 활동 연속일. 상태를 가리지 않는다 — 제출했으면 활동한 날이다. -->
+    <select id="findActivityDatesByUserId" resultType="java.time.LocalDate">
+        SELECT DISTINCT dma.ASSIGNED_DATE
+          FROM MISSION_LOG ml
+          JOIN MEMBER me ON me.ID = ml.MEMBER_ID
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+         WHERE me.USER_ID = #{userId}
+         ORDER BY 1 DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <!--
+      FR-025① 챌린지별 스트릭. 멤버 전원 것을 한 번에 읽어 서비스가 멤버별로 갈라 센다
+      (멤버 수만큼 쿼리를 날리지 않기 위해서다).
+
+      무엇을 성공으로 칠지는 정책이라 statuses 를 서비스에서 받는다.
+    -->
+    <select id="findSuccessDatesByChallengeId" resultType="MemberActivityDate">
+        SELECT DISTINCT ml.MEMBER_ID AS MEMBER_ID,
+               dma.ASSIGNED_DATE     AS ACTIVITY_DATE
+          FROM MISSION_LOG ml
+          JOIN DAILY_MISSION_ASSIGNMENT dma ON dma.ID = ml.ASSIGNMENT_ID
+         WHERE dma.CHALLENGE_ID = #{challengeId}
+           AND ml.STATUS IN
+        <foreach item="status" collection="statuses" open="(" separator="," close=")">
+            #{status}
+        </foreach>
+         ORDER BY ACTIVITY_DATE DESC
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+    <!--
+      FR-012c 방장 판정 대기 시작 시각. 자동 승인 기한의 기준점이라 DB 시계로 찍는다
+      (애플리케이션 시계를 쓰면 서버 시각이 어긋날 때 기한이 흔들린다).
+    -->
+    <update id="touchReviewRequestedAt">
+        UPDATE MISSION_LOG
+           SET REVIEW_REQUESTED_AT = SYSTIMESTAMP
+         WHERE ID = #{id}
+    </update>
+
+</mapper>
